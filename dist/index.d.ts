@@ -34,6 +34,20 @@ export interface TableInput {
 	hooks: HookProps;
 	content: ContentInput;
 }
+export interface WordLayout {
+	text: string;
+	isRtl: boolean;
+	width: number;
+}
+export interface LineLayout {
+	words: WordLayout[];
+	width: number;
+	isRtl: boolean;
+}
+export interface RichTextLayout {
+	lines: LineLayout[];
+	spaceWidth: number;
+}
 export type Pos = {
 	x: number;
 	y: number;
@@ -136,6 +150,7 @@ export declare class Cell {
 	section: Section;
 	colSpan: number;
 	rowSpan: number;
+	richTextLayout?: RichTextLayout;
 	contentHeight: number;
 	contentWidth: number;
 	wrappedWidth: number;

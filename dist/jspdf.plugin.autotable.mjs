@@ -1,3 +1,6 @@
+import 'rtl-detect';
+import 'cld3-asm';
+
 /**
  * Improved text function with halign and valign support
  * Inspiration from: http://stackoverflow.com/questions/28327510/align-text-right-using-jspdf/28433113#28433113
@@ -1075,6 +1078,252 @@ var Column = /** @class */ (function () {
     return Column;
 }());
 
+const RTL_FALLBACK_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+/**
+ * Reverses sequences of words based on language direction for proper RTL/LTR rendering
+ * @param paragraph - Array of rich words to process
+ * @param isRTL - Whether the overall paragraph direction is RTL
+ * @returns Processed array with properly ordered word sequences
+ */
+function reverseLanguageSequences(paragraph, isRTL) {
+    const result = [];
+    let currentSequence = [];
+    let currentLanguageType = null; // true for RTL, false for LTR
+    for (const wordObj of paragraph) {
+        const wordLanguageType = wordObj.isRtlLang;
+        // If this is the first word or same language type, add to current sequence
+        if (currentLanguageType === null ||
+            currentLanguageType === wordLanguageType) {
+            currentSequence.push(wordObj);
+            currentLanguageType = wordLanguageType;
+        }
+        else {
+            // Language changed, process the current sequence first
+            if (currentSequence.length > 0) {
+                // For RTL: reverse English sequences
+                // For LTR: reverse Arabic sequences
+                const shouldReverse = isRTL
+                    ? !currentLanguageType
+                    : currentLanguageType;
+                if (shouldReverse) {
+                    result.push(...currentSequence.reverse());
+                }
+                else {
+                    result.push(...currentSequence);
+                }
+            }
+            // Start new sequence with current word
+            currentSequence = [wordObj];
+            currentLanguageType = wordLanguageType;
+        }
+    }
+    // Process the last sequence
+    if (currentSequence.length > 0) {
+        const shouldReverse = isRTL ? !currentLanguageType : currentLanguageType;
+        if (shouldReverse) {
+            result.push(...currentSequence.reverse());
+        }
+        else {
+            result.push(...currentSequence);
+        }
+    }
+    return result;
+}
+function detectParagraphIsRtl(words, fallback) {
+    if (typeof fallback === "boolean") {
+        return fallback;
+    }
+    for (const word of words) {
+        if (word.isRtlLang) {
+            return true;
+        }
+        if (/[A-Za-z]/.test(word.word)) {
+            return false;
+        }
+    }
+    return false;
+}
+function normalizeToFragments(text) {
+    if (Array.isArray(text)) {
+        if (text.length === 0) {
+            return [];
+        }
+        if (typeof text[0] === "string") {
+            return text.map((part) => ({ text: part }));
+        }
+        return text;
+    }
+    return [{ text }];
+}
+function processFragmentsToWordsSync(fragments) {
+    const words = [];
+    fragments.forEach((fragment) => {
+        fragment.text
+            .split(/\s+/)
+            .filter((token) => token.length > 0)
+            .forEach((token) => {
+            words.push({
+                word: token,
+                isBold: fragment.isBold || false,
+                isRtlLang: RTL_FALLBACK_REGEX.test(token),
+            });
+        });
+    });
+    return words;
+}
+function layoutWordsToLinesSync(doc, words, maxWidth, spaceWidth, paragraphIsRtl) {
+    const lines = [];
+    if (words.length === 0) {
+        lines.push({ words: [], width: 0 });
+        return lines;
+    }
+    const orderedWords = reverseLanguageSequences(words, paragraphIsRtl);
+    let currentLine = [];
+    let currentWidth = 0;
+    orderedWords.forEach((word) => {
+        const wordWidth = doc.getTextWidth(word.word);
+        const extraSpace = currentLine.length > 0 ? spaceWidth : 0;
+        if (currentLine.length > 0 &&
+            maxWidth > 0 &&
+            currentWidth + extraSpace + wordWidth > maxWidth) {
+            lines.push({ words: currentLine, width: currentWidth });
+            currentLine = [];
+            currentWidth = 0;
+        }
+        if (currentLine.length > 0) {
+            currentWidth += spaceWidth;
+        }
+        currentLine.push(word);
+        currentWidth += wordWidth;
+    });
+    lines.push({ words: currentLine, width: currentWidth });
+    return lines;
+}
+function createRichTextLayoutSync({ doc, text, maxWidth, isRTL, }) {
+    const fragments = normalizeToFragments(text);
+    const spaceWidth = doc.getTextWidth(" ");
+    const resultLines = [];
+    if (fragments.length === 0) {
+        resultLines.push({ words: [], width: 0 });
+        return { lines: resultLines, spaceWidth };
+    }
+    fragments.forEach((fragment) => {
+        const words = processFragmentsToWordsSync([fragment]);
+        if (words.length === 0) {
+            resultLines.push({ words: [], width: 0 });
+            return;
+        }
+        const paragraphIsRtl = detectParagraphIsRtl(words, isRTL);
+        const lines = layoutWordsToLinesSync(doc, words, maxWidth, spaceWidth, paragraphIsRtl);
+        lines.forEach((line) => resultLines.push(line));
+    });
+    if (resultLines.length === 0) {
+        resultLines.push({ words: [], width: 0 });
+    }
+    return { lines: resultLines, spaceWidth };
+}
+
+function determineLineIsRtl(lineWords, fallback) {
+    for (var _i = 0, lineWords_1 = lineWords; _i < lineWords_1.length; _i++) {
+        var word = lineWords_1[_i];
+        if (word.isRtl)
+            return true;
+        if (/[A-Za-z]/.test(word.text))
+            return false;
+    }
+    return fallback;
+}
+function mapExternalLine(doc, externalLine, fallbackIsRtl) {
+    var words = externalLine.words.map(function (word) { return ({
+        text: word.word,
+        isRtl: word.isRtlLang,
+        width: doc.getTextWidth(word.word),
+    }); });
+    return {
+        words: words,
+        width: externalLine.width,
+        isRtl: determineLineIsRtl(words, fallbackIsRtl),
+    };
+}
+function computeRichTextLayout(doc, text, maxWidth, styles) {
+    if (styles === void 0) { styles = {}; }
+    var jsPdfDoc = doc.getDocument();
+    var fallbackIsRtl = styles.halign === 'right'
+        ? true
+        : styles.halign === 'left'
+            ? false
+            : undefined;
+    var layoutResult = createRichTextLayoutSync({
+        doc: jsPdfDoc,
+        text: text,
+        maxWidth: maxWidth,
+        isRTL: fallbackIsRtl,
+    });
+    var lines = layoutResult.lines.map(function (line) {
+        return mapExternalLine(doc, line, fallbackIsRtl !== null && fallbackIsRtl !== void 0 ? fallbackIsRtl : false);
+    });
+    if (lines.length === 0) {
+        lines.push({ words: [], width: 0, isRtl: fallbackIsRtl !== null && fallbackIsRtl !== void 0 ? fallbackIsRtl : false });
+    }
+    return { lines: lines, spaceWidth: layoutResult.spaceWidth };
+}
+function richLinesToPlainLines(layout) {
+    return layout.lines.map(function (line) { return line.words.map(function (w) { return w.text; }).join(' '); });
+}
+function renderRichText(doc, layout, y, bounds, styles) {
+    var jsPdfDoc = doc.getDocument();
+    var k = doc.scaleFactor();
+    var fontSize = jsPdfDoc.internal.getFontSize() / k;
+    var lineHeightFactor = doc.getLineHeightFactor();
+    var lineHeight = fontSize * lineHeightFactor;
+    var PHYSICAL_LINE_HEIGHT = 1.15;
+    var currentY = y + fontSize * (2 - PHYSICAL_LINE_HEIGHT);
+    if (styles.valign === 'middle') {
+        currentY -= (layout.lines.length / 2) * lineHeight;
+    }
+    else if (styles.valign === 'bottom') {
+        currentY -= layout.lines.length * lineHeight;
+    }
+    var _loop_1 = function (line) {
+        var startX = computeStartX(bounds.left, bounds.right, line.width, styles.halign, line.isRtl);
+        var currentX = startX;
+        if (line.words.length === 0) {
+            jsPdfDoc.text('', currentX, currentY);
+            currentY += lineHeight;
+            return "continue";
+        }
+        line.words.forEach(function (word, index) {
+            jsPdfDoc.text(word.text, currentX, currentY, { isOutputRtl: word.isRtl });
+            currentX += word.width;
+            if (index !== line.words.length - 1) {
+                currentX += layout.spaceWidth;
+            }
+        });
+        currentY += lineHeight;
+    };
+    for (var _i = 0, _a = layout.lines; _i < _a.length; _i++) {
+        var line = _a[_i];
+        _loop_1(line);
+    }
+}
+function computeStartX(left, right, lineWidth, align, lineIsRtl) {
+    var available = Math.max(right - left, 0);
+    switch (align) {
+        case 'right':
+            return Math.max(left, right - lineWidth);
+        case 'center':
+            return left + Math.max(available - lineWidth, 0) / 2;
+        case 'left':
+            return left;
+        case 'justify':
+            return left;
+        default:
+            return lineIsRtl
+                ? Math.max(left, right - lineWidth)
+                : left;
+    }
+}
+
 /**
  * Calculate the column widths
  */
@@ -1115,7 +1364,7 @@ function calculateWidths(doc, table) {
         // reduce font size, increase page size or remove custom cell widths
         // to allow more columns to be reduced in size
         resizeWidth = resizeWidth < 1 ? resizeWidth : Math.round(resizeWidth);
-        console.warn("Of the table content, ".concat(resizeWidth, " units width could not fit page"));
+        console.log("Of the table content, ".concat(resizeWidth, " units width could not fit page"));
     }
     applyColSpans(table);
     fitContent(table, doc);
@@ -1323,9 +1572,11 @@ function fitContent(table, doc) {
                 continue;
             doc.applyStyles(cell.styles, true);
             var textSpace = cell.width - cell.padding('horizontal');
-            if (cell.styles.overflow === 'linebreak') {
-                // Add one pt to textSpace to fix rounding error
-                cell.text = doc.splitTextToSize(cell.text, textSpace + 1 / doc.scaleFactor(), { fontSize: cell.styles.fontSize });
+            if (cell.styles.overflow === 'linebreak' &&
+                cell.styles.halign !== 'justify') {
+                var layout = computeRichTextLayout(doc, cell.text, textSpace + 1 / doc.scaleFactor(), cell.styles);
+                cell.richTextLayout = layout;
+                cell.text = richLinesToPlainLines(layout);
             }
             else if (cell.styles.overflow === 'ellipsize') {
                 cell.text = ellipsize(cell.text, textSpace, cell.styles, doc, '...');
@@ -1807,7 +2058,7 @@ function shouldPrintOnCurrentPage(doc, row, remainingPageSpace, table) {
     var minRowHeight = row.getMinimumRowHeight(table.columns, doc);
     var minRowFits = minRowHeight < remainingPageSpace;
     if (minRowHeight > maxRowHeight) {
-        console.error("Will not be able to print row ".concat(row.index, " correctly since it's minimum height is larger than page height"));
+        console.log("Will not be able to print row ".concat(row.index, " correctly since it's minimum height is larger than page height"));
         return true;
     }
     if (!minRowFits) {
@@ -1817,7 +2068,7 @@ function shouldPrintOnCurrentPage(doc, row, remainingPageSpace, table) {
     var rowHigherThanPage = row.getMaxCellHeight(table.columns) > maxRowHeight;
     if (rowHigherThanPage) {
         if (rowHasRowSpanCell) {
-            console.error("The content of row ".concat(row.index, " will not be drawn correctly since drawing rows with a height larger than the page height and has cells with rowspans is not supported."));
+            console.log("The content of row ".concat(row.index, " will not be drawn correctly since drawing rows with a height larger than the page height and has cells with rowspans is not supported."));
         }
         return true;
     }
@@ -1869,11 +2120,23 @@ function printRow(doc, table, row, cursor, columns) {
         }
         drawCellRect(doc, cell, cursor);
         var textPos = cell.getTextPos();
-        autoTableText(cell.text, textPos.x, textPos.y, {
-            halign: cell.styles.halign,
-            valign: cell.styles.valign,
-            maxWidth: Math.ceil(cell.width - cell.padding('left') - cell.padding('right')),
-        }, doc.getDocument());
+        var paddingLeft = cell.padding('left');
+        var paddingRight = cell.padding('right');
+        var textMaxWidth = Math.max(cell.width - paddingLeft - paddingRight, 0);
+        var bounds = {
+            left: cell.x + paddingLeft,
+            right: cell.x + cell.width - paddingRight,
+        };
+        if (cell.richTextLayout && cell.styles.halign !== 'justify') {
+            renderRichText(doc, cell.richTextLayout, textPos.y, bounds, cell.styles);
+        }
+        else {
+            autoTableText(cell.text, textPos.x, textPos.y, {
+                halign: cell.styles.halign,
+                valign: cell.styles.valign,
+                maxWidth: Math.ceil(textMaxWidth),
+            }, doc.getDocument());
+        }
         table.callCellHooks(doc, table.hooks.didDrawCell, cell, row, column, cursor);
         cursor.x += column.width;
     }

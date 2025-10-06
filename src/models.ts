@@ -10,6 +10,7 @@ import {
 import { DocHandler } from './documentHandler'
 import { CellHookData, HookData } from './HookData'
 import { TableInput } from './inputParser'
+import { RichTextLayout } from './rtlTextLayout'
 
 export type Pos = { x: number; y: number }
 export type PageHook = (data: HookData) => void | boolean
@@ -227,6 +228,7 @@ export class Cell {
   section: Section
   colSpan: number
   rowSpan: number
+  richTextLayout?: RichTextLayout
 
   contentHeight = 0
   contentWidth = 0

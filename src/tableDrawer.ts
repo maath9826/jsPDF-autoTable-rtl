@@ -3,6 +3,7 @@ import { addTableBorder, getFillStyle } from './common'
 import { LineWidths } from './config'
 import { DocHandler, jsPDFDocument } from './documentHandler'
 import { Cell, Column, Pos, Row, Table } from './models'
+import { renderRichText } from './rtlTextLayout'
 import { assign } from './polyfills'
 import { calculateAllColumnsCanFitInPage } from './tablePrinter'
 
@@ -427,19 +428,38 @@ function printRow(
     drawCellRect(doc, cell, cursor)
 
     const textPos = cell.getTextPos()
-    autoTableText(
-      cell.text,
-      textPos.x,
-      textPos.y,
-      {
-        halign: cell.styles.halign,
-        valign: cell.styles.valign,
-        maxWidth: Math.ceil(
-          cell.width - cell.padding('left') - cell.padding('right'),
-        ),
-      },
-      doc.getDocument(),
+    const paddingLeft = cell.padding('left')
+    const paddingRight = cell.padding('right')
+    const textMaxWidth = Math.max(
+      cell.width - paddingLeft - paddingRight,
+      0,
     )
+    const bounds = {
+      left: cell.x + paddingLeft,
+      right: cell.x + cell.width - paddingRight,
+    }
+
+    if (cell.richTextLayout && cell.styles.halign !== 'justify') {
+      renderRichText(
+        doc,
+        cell.richTextLayout,
+        textPos.y,
+        bounds,
+        cell.styles,
+      )
+    } else {
+      autoTableText(
+        cell.text,
+        textPos.x,
+        textPos.y,
+        {
+          halign: cell.styles.halign,
+          valign: cell.styles.valign,
+          maxWidth: Math.ceil(textMaxWidth),
+        },
+        doc.getDocument(),
+      )
+    }
 
     table.callCellHooks(doc, table.hooks.didDrawCell, cell, row, column, cursor)
 

@@ -2,6 +2,10 @@ import { getPageAvailableWidth, getStringWidth } from './common'
 import { Styles } from './config'
 import { DocHandler } from './documentHandler'
 import { Cell, Column, Row, Table } from './models'
+import {
+  computeRichTextLayout,
+  richLinesToPlainLines,
+} from './rtlTextLayout'
 
 /**
  * Calculate the column widths
@@ -295,13 +299,18 @@ function fitContent(table: Table, doc: DocHandler) {
 
       doc.applyStyles(cell.styles, true)
       const textSpace = cell.width - cell.padding('horizontal')
-      if (cell.styles.overflow === 'linebreak') {
-        // Add one pt to textSpace to fix rounding error
-        cell.text = doc.splitTextToSize(
+      if (
+        cell.styles.overflow === 'linebreak' &&
+        cell.styles.halign !== 'justify'
+      ) {
+        const layout = computeRichTextLayout(
+          doc,
           cell.text,
           textSpace + 1 / doc.scaleFactor(),
-          { fontSize: cell.styles.fontSize },
+          cell.styles,
         )
+        cell.richTextLayout = layout
+        cell.text = richLinesToPlainLines(layout)
       } else if (cell.styles.overflow === 'ellipsize') {
         cell.text = ellipsize(cell.text, textSpace, cell.styles, doc, '...')
       } else if (cell.styles.overflow === 'hidden') {

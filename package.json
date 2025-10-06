@@ -1,5 +1,5 @@
 {
-  "name": "jspdf-autotable",
+  "name": "jspdf-autotable-rtl",
   "version": "5.0.2",
   "description": "Generate pdf tables with javascript (jsPDF plugin)",
   "main": "dist/jspdf.plugin.autotable.js",
@@ -87,5 +87,9 @@
   "bugs": {
     "url": "https://github.com/simonbengtsson/jsPDF-AutoTable/issues"
   },
-  "homepage": "https://simonbengtsson.github.io/jsPDF-AutoTable"
+  "homepage": "https://simonbengtsson.github.io/jsPDF-AutoTable",
+  "dependencies": {
+    "cld3-asm": "^4.0.0",
+    "rtl-detect": "^1.1.2"
+  }
 }
