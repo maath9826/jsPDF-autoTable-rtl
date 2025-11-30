@@ -1,6 +1,6 @@
 /*!
  * 
- *               jsPDF AutoTable plugin v5.0.2
+ *               jsPDF AutoTable plugin v1.0.1
  *
  *               Copyright (c) 2025 Simon Bengtsson, https://github.com/simonbengtsson/jsPDF-AutoTable
  *               Licensed under the MIT License.
@@ -181,6 +181,7 @@ exports.calculateWidths = calculateWidths;
 exports.resizeColumns = resizeColumns;
 exports.ellipsize = ellipsize;
 var common_1 = __webpack_require__(799);
+var rtl_support_1 = __webpack_require__(324);
 /**
  * Calculate the column widths
  */
@@ -221,7 +222,7 @@ function calculateWidths(doc, table) {
         // reduce font size, increase page size or remove custom cell widths
         // to allow more columns to be reduced in size
         resizeWidth = resizeWidth < 1 ? resizeWidth : Math.round(resizeWidth);
-        console.warn("Of the table content, ".concat(resizeWidth, " units width could not fit page"));
+        console.log("Of the table content, ".concat(resizeWidth, " units width could not fit page"));
     }
     applyColSpans(table);
     fitContent(table, doc);
@@ -431,7 +432,12 @@ function fitContent(table, doc) {
             var textSpace = cell.width - cell.padding('horizontal');
             if (cell.styles.overflow === 'linebreak') {
                 // Add one pt to textSpace to fix rounding error
-                cell.text = doc.splitTextToSize(cell.text, textSpace + 1 / doc.scaleFactor(), { fontSize: cell.styles.fontSize });
+                if (/[\u0600-\u06FF]/.test(cell.text.join(''))) {
+                    cell.text = (0, rtl_support_1.splitTextToSizeRTL)(cell.text.join(' '), textSpace + 1 / doc.scaleFactor(), doc, cell.styles.fontSize);
+                }
+                else {
+                    cell.text = doc.splitTextToSize(cell.text, textSpace + 1 / doc.scaleFactor(), { fontSize: cell.styles.fontSize });
+                }
             }
             else if (cell.styles.overflow === 'ellipsize') {
                 cell.text = ellipsize(cell.text, textSpace, cell.styles, doc, '...');
@@ -515,6 +521,43 @@ function assign(target, s, s1, s2, s3) {
         }
     }
     return to;
+}
+
+
+/***/ }),
+
+/***/ 324:
+/***/ (function(__unused_webpack_module, exports) {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.splitTextToSizeRTL = splitTextToSizeRTL;
+function splitTextToSizeRTL(text, maxWidth, doc, fontSize) {
+    var words = text.split(' ');
+    var lines = [];
+    var currentLine = [];
+    var currentLineWidth = 0;
+    var spaceWidth = doc.getTextWidth(' ');
+    for (var _i = 0, words_1 = words; _i < words_1.length; _i++) {
+        var word = words_1[_i];
+        var wordWidth = doc.getTextWidth(word);
+        if (currentLine.length > 0 && currentLineWidth + spaceWidth + wordWidth > maxWidth) {
+            lines.push(currentLine.join(' '));
+            currentLine = [word];
+            currentLineWidth = wordWidth;
+        }
+        else {
+            if (currentLine.length > 0) {
+                currentLineWidth += spaceWidth;
+            }
+            currentLine.push(word);
+            currentLineWidth += wordWidth;
+        }
+    }
+    if (currentLine.length > 0) {
+        lines.push(currentLine.join(' '));
+    }
+    return lines;
 }
 
 
@@ -1944,7 +1987,7 @@ function shouldPrintOnCurrentPage(doc, row, remainingPageSpace, table) {
     var minRowHeight = row.getMinimumRowHeight(table.columns, doc);
     var minRowFits = minRowHeight < remainingPageSpace;
     if (minRowHeight > maxRowHeight) {
-        console.error("Will not be able to print row ".concat(row.index, " correctly since it's minimum height is larger than page height"));
+        console.log("Will not be able to print row ".concat(row.index, " correctly since it's minimum height is larger than page height"));
         return true;
     }
     if (!minRowFits) {
@@ -1954,7 +1997,7 @@ function shouldPrintOnCurrentPage(doc, row, remainingPageSpace, table) {
     var rowHigherThanPage = row.getMaxCellHeight(table.columns) > maxRowHeight;
     if (rowHigherThanPage) {
         if (rowHasRowSpanCell) {
-            console.error("The content of row ".concat(row.index, " will not be drawn correctly since drawing rows with a height larger than the page height and has cells with rowspans is not supported."));
+            console.log("The content of row ".concat(row.index, " will not be drawn correctly since drawing rows with a height larger than the page height and has cells with rowspans is not supported."));
         }
         return true;
     }

@@ -5,8 +5,7 @@ import { Cell, Column, Row, Table } from './models'
 import { splitTextToSizeRTL } from './rtl-support'
 
 // Detect common right-to-left scripts (Hebrew, Arabic, Syriac, Thaana, etc.)
-const RTL_CHAR_REGEX =
-  /[\u0591-\u07FF\u08A0-\u08FF\uFB1D-\uFDFD\uFE70-\uFEFC]/
+const RTL_CHAR_REGEX = /[\u0591-\u07FF\u08A0-\u08FF\uFB1D-\uFDFD\uFE70-\uFEFC]/
 
 /**
  * Calculate the column widths
@@ -307,7 +306,7 @@ function fitContent(table: Table, doc: DocHandler) {
             cell.text.join(' '),
             textSpace + 1 / doc.scaleFactor(),
             doc,
-            cell.styles.fontSize
+            cell.styles.fontSize,
           )
         } else {
           cell.text = doc.splitTextToSize(
