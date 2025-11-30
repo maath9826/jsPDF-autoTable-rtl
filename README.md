@@ -1,3 +1,36 @@
+# jsPDF-AutoTable-RTL (Unofficial Fork)
+
+**Generate PDF tables with RTL (right-to-left) support**
+
+> ⚠️ This is **not** the official jsPDF-AutoTable package.  
+> It is an **unofficial fork** of the original library created by  
+> **Simon Bengtsson**, modified to add **RTL support** for Arabic, Hebrew, Persian, and similar languages.
+>
+> 🔗 Official package: https://github.com/simonbengtsson/jsPDF-AutoTable  
+> 🔗 RTL fork package: https://github.com/maath9826/jsPDF-autoTable-rtl
+
+---
+
+## ✨ What’s new in this RTL fork?
+
+- Added full RTL rendering support  
+- Fixed text alignment for right-aligned scripts  
+- Corrected table layout issues for RTL content  
+- Ensured compatibility with existing AutoTable APIs  
+
+If you do **not** need RTL support, you should use the official package instead:
+
+👉 https://www.npmjs.com/package/jspdf-autotable
+
+---
+
+## 📝 Original README (copied from jsPDF-AutoTable)
+
+The content below is from the original library and is included for reference.  
+**Except for RTL-specific changes, all usage and APIs remain the same.**
+
+---
+
 # jsPDF-AutoTable - Table plugin for jsPDF
 
 **Generate PDF tables with Javascript**
@@ -15,6 +48,29 @@ Get jsPDF and this plugin by doing one of these things:
 - Use a CDN, for example: [https://unpkg.com/jspdf](https://unpkg.com/jspdf) and [https://unpkg.com/jspdf-autotable](https://unpkg.com/jspdf-autotable)
 
 ## Usage
+
+```js
+import { jsPDF } from 'jspdf'
+import { autoTable } from 'jspdf-autotable'
+
+const doc = new jsPDF()
+
+// It can parse html:
+// <table id="my-table"><!-- ... --></table>
+autoTable(doc, { html: '#my-table' })
+
+// Or use javascript directly:
+autoTable(doc, {
+  head: [['Name', 'Email', 'Country']],
+  body: [
+    ['David', 'david@example.com', 'Sweden'],
+    ['Castille', 'castille@example.com', 'Spain'],
+    // ...
+  ],
+})
+
+doc.save('table.pdf')
+
 
 ```js
 import { jsPDF } from 'jspdf'
