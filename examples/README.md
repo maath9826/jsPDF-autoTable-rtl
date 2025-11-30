@@ -1,3 +1,32 @@
+# jspdf-autotable-rtl
+
+**Unofficial RTL-enabled fork of [`jspdf-autotable`](https://github.com/simonbengtsson/jsPDF-AutoTable).**
+
+This package is based on the original `jspdf-autotable` library by  
+**Simon Bengtsson (MIT License)**.
+
+The goal of this fork is to add **right-to-left (RTL) text and table support**, which is not available in the original plugin.  
+All credits for the original implementation go to the original author.
+
+---
+
+## What’s different in this RTL fork?
+
+- Added RTL support for table rendering  
+- Fixed alignment, cell layout, and text direction issues  
+- Ensured compatibility with existing jspdf-autotable APIs  
+
+If you are not using RTL languages (Arabic, Hebrew, Persian, etc.),  
+you should use the official package instead:
+
+👉 https://www.npmjs.com/package/jspdf-autotable
+
+---
+
+## Original README (below)
+
+The content below is copied from the original repository for reference.
+
 ## Examples for jspdf-autotable
 
 ### Default examples
